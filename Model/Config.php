@@ -16,7 +16,7 @@ use Magento\Store\Model\ScopeInterface;
  */
 class Config
 {
-    public const MODULE_VERSION = '1.0.0';
+    public const MODULE_VERSION = '1.1.0';
 
     private const PATH = 'angeo_ucp/checkout/';
 

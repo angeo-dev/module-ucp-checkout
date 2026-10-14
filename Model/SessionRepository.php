@@ -50,6 +50,22 @@ class SessionRepository
     }
 
     /**
+     * The completed session that produced this order, if any.
+     */
+    public function getByOrderId(int $orderId): ?Session
+    {
+        return $orderId > 0 ? $this->fetchOne('order_id', (string) $orderId) : null;
+    }
+
+    public function getByOrderIncrementId(string $incrementId): ?Session
+    {
+        if ($incrementId === '' || strlen($incrementId) > 50) {
+            return null;
+        }
+        return $this->fetchOne('order_increment_id', $incrementId);
+    }
+
+    /**
      * The newest non-terminal session for a quote, if any.
      */
     public function getOpenByQuoteId(int $quoteId): ?Session

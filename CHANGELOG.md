@@ -4,6 +4,25 @@ All notable changes to `angeo/module-ucp-checkout` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-10-14
+
+### Added
+
+- **Order capability** (`dev.ucp.shopping.order`): `GET {endpoint}/orders/{id}`
+  returns the full order — line status, shipping expectation, shipments with
+  tracking, refunds, cancellation, totals. Line ids match the checkout's.
+  Only the platform that created the checkout (same `UCP-Agent` profile) can
+  read it; everyone else gets 404.
+- **Order webhooks**: full order entity POSTed to the platform's
+  `webhook_url` (from its profile) on order created, shipment, credit memo
+  and cancellation. RFC 9421 signature with `Content-Digest`, `Webhook-Id`,
+  `Webhook-Timestamp`, store `UCP-Agent`. Queue table
+  `angeo_ucp_order_webhook`, sent every minute, retries 1 min → 12 h. HTTPS
+  only, no redirects, host pinned to a checked public address.
+- Signing with ES256, ES384 or Ed25519 keys from `app/etc/env.php`
+  (`ucp/signing_keys`).
+- Registers `dev.ucp.shopping.order` as implemented.
+
 ## [1.0.0] - 2026-10-14
 
 First release. UCP spec 2026-08-25.

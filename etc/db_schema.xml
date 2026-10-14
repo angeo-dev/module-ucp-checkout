@@ -45,6 +45,35 @@
     </table>
 
     <!--
+        Order webhooks to deliver (UCP order capability). The order entity is
+        built at send time, so each delivery carries the current state.
+    -->
+    <table name="angeo_ucp_order_webhook" resource="checkout" engine="innodb"
+           comment="Angeo UCP order webhook queue">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true"/>
+        <column xsi:type="varchar" name="event_id" nullable="false" length="64" comment="Webhook-Id"/>
+        <column xsi:type="int" name="order_id" unsigned="true" nullable="false"/>
+        <column xsi:type="varchar" name="session_id" nullable="false" length="64"/>
+        <column xsi:type="varchar" name="event" nullable="false" length="32"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" default="pending"/>
+        <column xsi:type="smallint" name="attempts" unsigned="true" nullable="false" default="0"/>
+        <column xsi:type="smallint" name="last_status" unsigned="true" nullable="true"/>
+        <column xsi:type="varchar" name="last_error" nullable="true" length="255"/>
+        <column xsi:type="timestamp" name="next_attempt_at" nullable="false" default="CURRENT_TIMESTAMP"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="ANGEO_UCP_ORDER_WEBHOOK_EVENT_ID">
+            <column name="event_id"/>
+        </constraint>
+        <index referenceId="ANGEO_UCP_ORDER_WEBHOOK_STATUS_NEXT" indexType="btree">
+            <column name="status"/>
+            <column name="next_attempt_at"/>
+        </index>
+    </table>
+
+    <!--
         Idempotency-Key store (UCP REST binding: keep at least 24 hours,
         replay on the same body, 409 on a different body).
     -->

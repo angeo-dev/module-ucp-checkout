@@ -9,7 +9,9 @@ declare(strict_types=1);
 namespace Angeo\UcpCheckout\Observer;
 
 use Angeo\UcpCheckout\Model\Session;
+use Angeo\Ucp\Model\Config as UcpConfig;
 use Angeo\UcpCheckout\Model\SessionRepository;
+use Angeo\UcpCheckout\Model\WebhookQueue;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Quote\Model\Quote;
@@ -29,6 +31,8 @@ class OrderPlaced implements ObserverInterface
 {
     public function __construct(
         private readonly SessionRepository $sessions,
+        private readonly WebhookQueue $webhooks,
+        private readonly UcpConfig $ucpConfig,
         private readonly StoreManagerInterface $storeManager,
         private readonly LoggerInterface $logger
     ) {
@@ -57,6 +61,10 @@ class OrderPlaced implements ObserverInterface
             $session->snapshot = null;
             $session->pendingMessages = [];
             $this->sessions->save($session);
+            if ($this->ucpConfig->isOrderDeclared()) {
+                // Spec: MUST send "order created" with the full entity.
+                $this->webhooks->enqueue((int) $order->getId(), $session->sessionId, 'order.created');
+            }
         } catch (\Throwable $e) {
             $this->logger->error('[Angeo_UcpCheckout] Could not mark UCP session completed: ' . $e->getMessage());
         }

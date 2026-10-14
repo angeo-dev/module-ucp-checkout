@@ -29,6 +29,7 @@ No card data, no payment handler, no PCI scope.
 | Update Checkout | `PUT {endpoint}/checkout-sessions/{id}` | **Full replacement**: lines, buyer, discount code, shipping |
 | Complete Checkout | `POST {endpoint}/checkout-sessions/{id}/complete` | `requires_escalation` + `continue_url` — never charges |
 | Cancel Checkout | `POST {endpoint}/checkout-sessions/{id}/cancel` | Session and quote closed |
+| Get Order | `GET {endpoint}/orders/{order number}` | Order status, shipments, refunds (order capability) |
 | continue_url | `GET /ucp/checkout/continue/{token}` | Loads the cart in the buyer's browser → `/checkout` |
 
 `{endpoint}` is `https://your-store/ucp/v1` by default.
@@ -54,6 +55,28 @@ and it appears as the `fulfillment` total. Countries outside *Allowed
 Countries* and unknown option ids come back as recoverable errors with a
 `path`. An Update without `fulfillment` clears the address and the rate
 (full replacement). Pickup is not offered.
+
+**Orders (order capability):** when the buyer has placed the order, the agent
+can read it at `GET {endpoint}/orders/{order number}`: line status
+(processing, partial, fulfilled, removed), shipments with tracking, refunds,
+cancellation and totals. Only the platform whose `UCP-Agent` profile created
+the checkout gets the order; others get `404`. Use *Inbound Signature Mode =
+required* so the profile is proven by a signature.
+
+**Order webhooks:** if the platform's own profile declares
+`capabilities["dev.ucp.shopping.order"][].config.webhook_url`, the store
+POSTs the full order to it on create, shipment, refund and cancellation.
+Each call is signed (RFC 9421 + `Content-Digest`) with your store key and
+carries `Webhook-Id` and `Webhook-Timestamp`. A cron job sends every minute
+and retries after 1 min, 5 min, 30 min, 2 h and 12 h. Signing needs the
+private key in `app/etc/env.php`, as `angeo:ucp:keys:generate` prints it:
+
+```php
+'ucp' => ['signing_keys' => ['<kid>' => '-----BEGIN PRIVATE KEY-----...']],
+```
+
+ES256, ES384 and Ed25519 keys work. The kid must also be published in the
+profile.
 
 **Item ids:** `gid://magento/ProductVariant/{id}` (as returned by
 [`angeo/module-ucp-catalog`](https://github.com/angeo-dev/module-ucp-catalog)),
@@ -86,8 +109,8 @@ bin/magento cache:flush
 
 **Stores → Configuration → Angeo → UCP**
 
-1. *Capabilities → Checkout*: **Yes**. Optional: *Extensions → Discount*
-   and *Extensions → Fulfillment*: **Yes**.
+1. *Capabilities → Checkout*: **Yes**. Optional: *Capabilities → Order*,
+   *Extensions → Discount* and *Extensions → Fulfillment*: **Yes**.
 2. *Transport → REST Endpoint URL*: leave empty (`{baseUrl}/ucp/v1`), or
    enter your own HTTPS URL — the module answers on its path too.
 3. *Checkout Sessions*: legal links (terms, privacy, refund — sent in every
@@ -116,17 +139,21 @@ curl -s -X POST https://your-store/ucp/v1/checkout-sessions \
 ## Conformance
 
 The official [UCP conformance suite](https://github.com/Universal-Commerce-Protocol/conformance)
-tests completion with payment and webhooks too. This
+tests completion with payment too. This
 module does not do those on purpose (see *Not included*), so a full run will
 not be 77/77. Discovery, version negotiation, the create/get/update/cancel
 lifecycle, idempotency and shipping options are the parts it is built to pass.
+
+## Checkout over MCP
+
+Agents that use MCP instead of REST: install
+[`angeo/module-ucp-checkout-mcp`](https://github.com/angeo-dev/module-ucp-checkout-mcp).
+It adds the same five checkout operations as MCP tools.
 
 ## Not included (yet)
 
 * Payment through the agent (payment handlers, AP2, card credentials).
 * Pickup, multiple destinations or packages per checkout.
-* Order capability and webhooks.
-* Checkout over the MCP transport. Agents must use REST.
 * Signed-in customer checkouts over the API (identity linking).
 
 ## License

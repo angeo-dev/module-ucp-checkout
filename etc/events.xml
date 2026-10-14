@@ -7,4 +7,14 @@
     <event name="checkout_submit_all_after">
         <observer name="angeo_ucp_checkout_order_placed" instance="Angeo\UcpCheckout\Observer\OrderPlaced"/>
     </event>
+    <!-- Order changes on orders from a UCP checkout → "order updated" webhook. -->
+    <event name="sales_order_shipment_save_after">
+        <observer name="angeo_ucp_checkout_order_changed" instance="Angeo\UcpCheckout\Observer\OrderChanged"/>
+    </event>
+    <event name="sales_order_creditmemo_save_after">
+        <observer name="angeo_ucp_checkout_order_changed" instance="Angeo\UcpCheckout\Observer\OrderChanged"/>
+    </event>
+    <event name="order_cancel_after">
+        <observer name="angeo_ucp_checkout_order_changed" instance="Angeo\UcpCheckout\Observer\OrderChanged"/>
+    </event>
 </config>

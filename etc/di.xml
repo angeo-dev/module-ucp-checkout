@@ -12,6 +12,7 @@
                 <item name="dev.ucp.shopping.checkout" xsi:type="boolean">true</item>
                 <item name="dev.ucp.shopping.discount" xsi:type="boolean">true</item>
                 <item name="dev.ucp.shopping.fulfillment" xsi:type="boolean">true</item>
+                <item name="dev.ucp.shopping.order" xsi:type="boolean">true</item>
             </argument>
         </arguments>
     </type>

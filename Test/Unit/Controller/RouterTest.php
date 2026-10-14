@@ -11,6 +11,7 @@ namespace Angeo\UcpCheckout\Test\Unit\Controller;
 use Angeo\UcpCheckout\Controller\Checkout\Cancel;
 use Angeo\UcpCheckout\Controller\Checkout\Complete;
 use Angeo\UcpCheckout\Controller\Checkout\Create;
+use Angeo\UcpCheckout\Controller\Checkout\Order;
 use Angeo\UcpCheckout\Controller\Checkout\Resume;
 use Angeo\UcpCheckout\Controller\Checkout\Session;
 use Angeo\UcpCheckout\Controller\Router;
@@ -28,6 +29,7 @@ class RouterTest extends TestCase
         self::assertSame([Session::class, 'session', [Router::PARAM_ID => $id]], Router::route("/ucp/v1/checkout-sessions/$id", self::BASES));
         self::assertSame([Complete::class, 'complete', [Router::PARAM_ID => $id]], Router::route("/ucp/v1/checkout-sessions/$id/complete", self::BASES));
         self::assertSame([Cancel::class, 'cancel', [Router::PARAM_ID => $id]], Router::route("/api/ucp/checkout-sessions/$id/cancel", self::BASES));
+        self::assertSame([Order::class, 'order', [Router::PARAM_ORDER => '000000042']], Router::route('/ucp/v1/orders/000000042', self::BASES));
         $token = str_repeat('0f', 24);
         self::assertSame([Resume::class, 'resume', [Router::PARAM_TOKEN => $token]], Router::route("/ucp/checkout/continue/$token", self::BASES));
     }
@@ -39,5 +41,7 @@ class RouterTest extends TestCase
         self::assertNull(Router::route('/ucp/v1/checkout-sessionsX', self::BASES));
         self::assertNull(Router::route('/ucp/checkout/continue/short', self::BASES));
         self::assertNull(Router::route('/other/checkout-sessions', self::BASES));
+        self::assertNull(Router::route('/ucp/v1/orders/../../etc', self::BASES));
+        self::assertNull(Router::route('/ucp/v1/orders/', self::BASES));
     }
 }

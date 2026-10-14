@@ -1,8 +1,8 @@
 {
     "name": "angeo/module-ucp-checkout",
-    "description": "UCP checkout for Magento 2 (dev.ucp.shopping.checkout + discount + fulfillment, spec 2026-08-25). AI agents create, update and cancel real checkout sessions over REST and see live shipping rates; payment is handed off to the store's own checkout page via continue_url. No card data, no PCI scope.",
+    "description": "UCP checkout for Magento 2 (dev.ucp.shopping.checkout + discount + fulfillment + order with webhooks, spec 2026-08-25). AI agents create, update and cancel real checkout sessions over REST and see live shipping rates; payment is handed off to the store's own checkout page via continue_url. No card data, no PCI scope.",
     "type": "magento2-module",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "license": "MIT",
     "keywords": [
         "magento2",

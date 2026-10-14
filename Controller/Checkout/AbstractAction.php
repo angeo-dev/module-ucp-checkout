@@ -69,8 +69,8 @@ abstract class AbstractAction implements CsrfAwareActionInterface
 
     public function execute(): ResultInterface
     {
-        if (!$this->ucpConfig->isEnabled() || !$this->ucpConfig->isCheckoutDeclared()) {
-            return $this->error(404, 'not_found', 'This site does not advertise UCP checkout.');
+        if (!$this->ucpConfig->isEnabled() || !$this->capabilityDeclared()) {
+            return $this->error(404, 'not_found', 'This site does not advertise this UCP capability.');
         }
         if (!$this->request instanceof HttpRequest) {
             return $this->error(400, 'invalid', 'Unsupported request.');
@@ -133,6 +133,14 @@ abstract class AbstractAction implements CsrfAwareActionInterface
             $this->idempotency->save($operation, $key, $sessionId, $hash, $result->status, $json);
         }
         return $this->raw($result->status, $json);
+    }
+
+    /**
+     * The capability this action serves must be in the profile.
+     */
+    protected function capabilityDeclared(): bool
+    {
+        return $this->ucpConfig->isCheckoutDeclared();
     }
 
     protected function checkoutId(): string

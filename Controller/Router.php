@@ -24,6 +24,7 @@ use Magento\Framework\App\RouterInterface;
  *   PUT  {endpoint}/checkout-sessions/{id}          -> Checkout\Session (update)
  *   POST {endpoint}/checkout-sessions/{id}/complete -> Checkout\Complete
  *   POST {endpoint}/checkout-sessions/{id}/cancel   -> Checkout\Cancel
+ *   GET  {endpoint}/orders/{id}                     -> Checkout\Order (order capability)
  *   GET  /ucp/checkout/continue/{token}             -> Checkout\Resume
  *
  * {endpoint} is /ucp/v1 (Angeo_Ucp 2.2.0 default) or the path of the REST
@@ -34,6 +35,7 @@ class Router implements RouterInterface
 {
     public const PARAM_ID    = 'ucp_checkout_id';
     public const PARAM_TOKEN = 'ucp_continue_token';
+    public const PARAM_ORDER = 'ucp_order_id';
 
     public function __construct(
         private readonly ActionFactory $actionFactory,
@@ -80,6 +82,9 @@ class Router implements RouterInterface
 
         foreach ($basePaths as $base) {
             $base = '/' . trim($base, '/');
+            if (preg_match('#^' . preg_quote($base, '#') . '/orders/([A-Za-z0-9_\-]{1,50})$#', $path, $m)) {
+                return [Checkout\Order::class, 'order', [self::PARAM_ORDER => $m[1]]];
+            }
             if (!str_starts_with($path, $base . '/checkout-sessions')) {
                 continue;
             }

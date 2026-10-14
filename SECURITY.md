@@ -37,6 +37,11 @@ for security problems.
 - **No PHP session on agent calls.** Only the `continue_url` page uses the
   shopper's session.
 
+- **Orders.** Get Order answers only the platform profile that created the
+  checkout. Webhooks go only to HTTPS URLs that resolve to public
+  addresses; the address is pinned for the request and redirects are not
+  followed.
+
 In scope: anything that lets a caller read or change a checkout it did not
 create, reach a customer's cart or data, place an order, or exceed a
 configured limit. Out of scope: rate limiting (do it at the web server or
