@@ -1,0 +1,51 @@
+{
+    "angeo_ucp_checkout_session": {
+        "column": {
+            "entity_id": true,
+            "session_id": true,
+            "quote_id": true,
+            "store_id": true,
+            "status": true,
+            "agent_profile": true,
+            "continue_token": true,
+            "item_refs": true,
+            "pending_messages": true,
+            "snapshot": true,
+            "order_id": true,
+            "order_increment_id": true,
+            "order_url": true,
+            "destination_id": true,
+            "expires_at": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "ANGEO_UCP_CHECKOUT_SESSION_QUOTE_ID": true,
+            "ANGEO_UCP_CHECKOUT_SESSION_EXPIRES_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "ANGEO_UCP_CHECKOUT_SESSION_SESSION_ID": true,
+            "ANGEO_UCP_CHECKOUT_SESSION_CONTINUE_TOKEN": true
+        }
+    },
+    "angeo_ucp_checkout_idempotency": {
+        "column": {
+            "entity_id": true,
+            "operation": true,
+            "idempotency_key": true,
+            "session_id": true,
+            "request_hash": true,
+            "http_status": true,
+            "response_body": true,
+            "created_at": true
+        },
+        "index": {
+            "ANGEO_UCP_CHECKOUT_IDEMPOTENCY_CREATED_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "ANGEO_UCP_CHECKOUT_IDEMPOTENCY_OP_KEY_SESSION": true
+        }
+    }
+}

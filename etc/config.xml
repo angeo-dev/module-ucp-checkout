@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <angeo_ucp>
+            <checkout>
+                <!-- Spec default TTL: 6 hours from creation. -->
+                <session_ttl_hours>6</session_ttl_hours>
+                <max_line_items>50</max_line_items>
+                <max_quantity>1000</max_quantity>
+                <terms_url></terms_url>
+                <privacy_url></privacy_url>
+                <refund_url></refund_url>
+                <handoff_path>checkout</handoff_path>
+                <retention_days>30</retention_days>
+            </checkout>
+        </angeo_ucp>
+    </default>
+</config>

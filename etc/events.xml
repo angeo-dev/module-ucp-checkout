@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <!-- Closes the loop: the buyer paid on the store checkout, so the UCP
+         session becomes `completed` with an `order`. Global area: orders can
+         also be placed through REST/GraphQL checkouts. -->
+    <event name="checkout_submit_all_after">
+        <observer name="angeo_ucp_checkout_order_placed" instance="Angeo\UcpCheckout\Observer\OrderPlaced"/>
+    </event>
+</config>

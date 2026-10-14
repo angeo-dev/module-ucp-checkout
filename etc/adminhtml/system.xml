@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <!-- Adds a group to the existing Angeo → UCP section of Angeo_Ucp. -->
+        <section id="angeo_ucp">
+            <group id="checkout" translate="label comment" type="text" sortOrder="25"
+                   showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Checkout Sessions (angeo/module-ucp-checkout)</label>
+                <comment><![CDATA[Agents create and update checkout sessions over REST at <code>{endpoint}/checkout-sessions</code>. Payment always happens on your own checkout page: Complete Checkout answers <code>requires_escalation</code> with a <code>continue_url</code>. Turn on <em>Capabilities → Checkout</em> (and <em>Extensions → Discount</em> if you want coupon codes) to advertise it.]]></comment>
+                <field id="session_ttl_hours" translate="label" type="text" sortOrder="10"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Session Lifetime (hours)</label>
+                    <validate>validate-digits validate-digits-range digits-range-1-72</validate>
+                </field>
+                <field id="max_line_items" translate="label" type="text" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Max Line Items per Session</label>
+                    <validate>validate-digits validate-digits-range digits-range-1-200</validate>
+                </field>
+                <field id="max_quantity" translate="label" type="text" sortOrder="30"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Max Quantity per Line</label>
+                    <validate>validate-digits validate-digits-range digits-range-1-100000</validate>
+                </field>
+                <field id="terms_url" translate="label comment" type="text" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Terms of Service URL</label>
+                    <validate>validate-url</validate>
+                    <comment><![CDATA[Sent in every checkout as <code>links[]</code>. The spec calls these links mandatory for legal compliance.]]></comment>
+                </field>
+                <field id="privacy_url" translate="label" type="text" sortOrder="50"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Privacy Policy URL</label>
+                    <validate>validate-url</validate>
+                </field>
+                <field id="refund_url" translate="label" type="text" sortOrder="60"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Refund / Returns Policy URL</label>
+                    <validate>validate-url</validate>
+                </field>
+                <field id="handoff_path" translate="label comment" type="text" sortOrder="70"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Handoff Page Path</label>
+                    <comment><![CDATA[Where <code>continue_url</code> sends the buyer after loading their cart. <code>checkout</code> (default) or <code>checkout/cart</code>.]]></comment>
+                </field>
+                <field id="retention_days" translate="label comment" type="text" sortOrder="80"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Keep Expired Sessions (days)</label>
+                    <validate>validate-digits</validate>
+                    <comment><![CDATA[A daily cron removes session rows this old and idempotency keys older than 24 hours.]]></comment>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>
