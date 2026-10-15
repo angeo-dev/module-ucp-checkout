@@ -38,7 +38,6 @@ class WebhookSender
         private readonly WebhookTarget $target,
         private readonly WebhookSigner $signer,
         private readonly SigningKey $signingKey,
-        private readonly UcpConfig $ucpConfig,
         private readonly StoreManagerInterface $storeManager,
         private readonly LoggerInterface $logger
     ) {
