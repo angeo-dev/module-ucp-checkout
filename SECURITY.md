@@ -26,6 +26,10 @@ for security problems.
 - **Unguessable handles.** Checkout ids are `chk_` + 128 random bits. The
   `continue_url` uses a separate 192-bit token, so knowing a checkout id is
   not enough to load its cart into a browser.
+- **No tokens in the database (1.1.1+).** The `continue_url` token is an HMAC
+  of the checkout id with the store's crypt key from `app/etc/env.php`. The
+  session table keeps only its SHA-256. A database backup or a read-only SQL
+  user cannot open a checkout without `env.php` as well.
 - **Storefront rules apply.** Only enabled products assigned to the current
   website and visible on the storefront (or children of such a configurable)
   can be added. Hidden products answer like missing ones.

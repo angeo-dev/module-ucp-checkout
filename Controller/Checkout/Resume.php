@@ -29,8 +29,9 @@ use Psr\Log\LoggerInterface;
  * Puts the agent-built quote into the buyer's own browser session and sends
  * them to the store checkout, where they choose shipping and pay. A
  * signed-in customer gets the items merged into their cart instead, so
- * nothing they already had is lost. The token is long and random; the UCP
- * checkout id alone cannot open a cart.
+ * nothing they already had is lost. The token is 192 bits, derived from the
+ * checkout id with the store's crypt key; the database keeps only its hash.
+ * The UCP checkout id alone cannot open a cart.
  */
 class Resume implements HttpGetActionInterface
 {

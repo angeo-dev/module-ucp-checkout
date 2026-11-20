@@ -4,6 +4,28 @@ All notable changes to `angeo/module-ucp-checkout` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-10-26
+
+### Security
+
+- **`continue_url` tokens are no longer stored in plain text.** Anyone who
+  could read `angeo_ucp_checkout_session` (a backup, a dump, a read-only SQL
+  user) could open an open checkout in a browser and see the buyer's email
+  and address. The token is now an HMAC of the checkout id with the store's
+  crypt key, and the table keeps only its SHA-256. The token is computed
+  again for every response, so `continue_url` stays the same for the life of
+  the session.
+
+### Upgrade notes
+
+- A data patch rewrites the column for existing sessions. A `continue_url`
+  handed out before the upgrade stops working; the agent gets the new one in
+  its next checkout response. Sessions live 6 hours by default.
+- Rotating the crypt key (`bin/magento encryption:key:change`) changes the
+  tokens of open sessions in the same way.
+- `SessionRepository::newContinueToken()` now takes the checkout id. With DI
+  nothing else changes.
+
 ## [1.1.0] - 2026-10-14
 
 ### Added

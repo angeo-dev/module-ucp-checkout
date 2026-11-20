@@ -19,7 +19,8 @@ class SessionRepository
     private const TABLE = 'angeo_ucp_checkout_session';
 
     public function __construct(
-        private readonly ResourceConnection $resource
+        private readonly ResourceConnection $resource,
+        private readonly ContinueToken $continueToken
     ) {
     }
 
@@ -28,9 +29,13 @@ class SessionRepository
         return 'chk_' . bin2hex(random_bytes(16));
     }
 
-    public function newContinueToken(): string
+    /**
+     * The continue_url token for a checkout id. Since 1.1.1 it is derived
+     * from the id and the store's crypt key; the table keeps only its hash.
+     */
+    public function newContinueToken(string $sessionId): string
     {
-        return bin2hex(random_bytes(24));
+        return $this->continueToken->forSession($sessionId);
     }
 
     public function getBySessionId(string $sessionId): ?Session
@@ -43,10 +48,10 @@ class SessionRepository
 
     public function getByContinueToken(string $token): ?Session
     {
-        if (!preg_match('/^[0-9a-f]{48}$/', $token)) {
+        if (!ContinueToken::isWellFormed($token)) {
             return null;
         }
-        return $this->fetchOne('continue_token', $token);
+        return $this->fetchOne('continue_token', ContinueToken::storageHash($token));
     }
 
     /**
@@ -91,7 +96,7 @@ class SessionRepository
             'store_id'           => $session->storeId,
             'status'             => $session->status,
             'agent_profile'      => mb_substr($session->agentProfile, 0, 512),
-            'continue_token'     => $session->continueToken,
+            'continue_token'     => ContinueToken::storageHash($session->continueToken),
             'item_refs'          => (string) json_encode($session->itemRefs),
             'pending_messages'   => (string) json_encode($session->pendingMessages),
             'snapshot'           => $session->snapshot === null ? null : (string) json_encode($session->snapshot),
@@ -156,7 +161,7 @@ class SessionRepository
             (int) $row['store_id'],
             (string) $row['status'],
             (string) ($row['agent_profile'] ?? ''),
-            (string) $row['continue_token'],
+            $this->continueToken->forSession((string) $row['session_id']),
             array_map('strval', $decode($row['item_refs'] ?? null)),
             $decode($row['pending_messages'] ?? null),
             is_array($snapshot) ? $snapshot : null,

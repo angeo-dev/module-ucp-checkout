@@ -16,7 +16,7 @@
         <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false"/>
         <column xsi:type="varchar" name="status" nullable="false" length="32" default="incomplete"/>
         <column xsi:type="varchar" name="agent_profile" nullable="true" length="512"/>
-        <column xsi:type="varchar" name="continue_token" nullable="false" length="64"/>
+        <column xsi:type="varchar" name="continue_token" nullable="false" length="64" comment="SHA-256 of the continue_url token (1.1.1+)"/>
         <column xsi:type="text" name="item_refs" nullable="true" comment="JSON: quote item id => requested item id"/>
         <column xsi:type="text" name="pending_messages" nullable="true" comment="JSON: messages from the last write"/>
         <column xsi:type="mediumtext" name="snapshot" nullable="true" comment="JSON: last response once terminal"/>

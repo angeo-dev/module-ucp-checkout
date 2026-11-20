@@ -86,14 +86,15 @@ class CheckoutService
         $destinationId = $this->applyFulfillment($quote, $request, $messages, null, false);
 
         $now = time();
+        $sessionId = $this->sessions->newSessionId();
         $session = new Session(
             null,
-            $this->sessions->newSessionId(),
+            $sessionId,
             (int) $quote->getId(),
             (int) $store->getId(),
             Session::STATUS_INCOMPLETE,
             $agentProfile,
-            $this->sessions->newContinueToken(),
+            $this->sessions->newContinueToken($sessionId),
             $this->itemRefs($added),
             $messages,
             null,
