@@ -1,0 +1,13 @@
+{
+  "ucp_version": "2026-08-25",
+  "required_capabilities": [
+    "dev.ucp.shopping.checkout",
+    "dev.ucp.shopping.order"
+  ],
+  "currency": "USD",
+  "items": [
+    { "id": "24-MB02", "title": "Fusion Backpack", "price": 5900 }
+  ],
+  "out_of_stock_item": { "id": "ANGEO-OOS-TEST", "title": "Out of stock test product" },
+  "non_existent_item": { "id": "angeo-does-not-exist", "title": "Non-existent item" }
+}

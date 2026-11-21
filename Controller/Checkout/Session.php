@@ -26,8 +26,8 @@ class Session extends AbstractAction implements HttpGetActionInterface, HttpPutA
     protected function process(array $body, string $agentProfile): CheckoutResult
     {
         return $this->isPut()
-            ? $this->checkout->update($this->checkoutId(), $body)
-            : $this->checkout->get($this->checkoutId());
+            ? $this->checkout->update($this->checkoutId(), $body, $agentProfile)
+            : $this->checkout->get($this->checkoutId(), $agentProfile);
     }
 
     private function isPut(): bool

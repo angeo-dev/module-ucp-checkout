@@ -113,9 +113,15 @@ class CheckoutService
         return new CheckoutResult(201, $resource);
     }
 
-    public function get(string $sessionId): CheckoutResult
+    /**
+     * @param string|null $agentProfile Profile of the calling platform. When
+     *        given (1.2.0+, every controller and MCP tool), a checkout created
+     *        by another profile answers 404, exactly like a missing one. Null
+     *        skips the check and exists only for callers built against 1.1.
+     */
+    public function get(string $sessionId, ?string $agentProfile = null): CheckoutResult
     {
-        $session = $this->sessions->getBySessionId($sessionId);
+        $session = $this->ownedSession($sessionId, $agentProfile);
         if ($session === null) {
             return $this->notFound();
         }
@@ -128,9 +134,9 @@ class CheckoutService
      *
      * @param array<string, mixed> $request
      */
-    public function update(string $sessionId, array $request): CheckoutResult
+    public function update(string $sessionId, array $request, ?string $agentProfile = null): CheckoutResult
     {
-        $session = $this->sessions->getBySessionId($sessionId);
+        $session = $this->ownedSession($sessionId, $agentProfile);
         if ($session === null) {
             return $this->notFound();
         }
@@ -171,9 +177,9 @@ class CheckoutService
      * checkout has everything the API can collect; otherwise incomplete with
      * the recoverable messages to fix first.
      */
-    public function complete(string $sessionId): CheckoutResult
+    public function complete(string $sessionId, ?string $agentProfile = null): CheckoutResult
     {
-        $session = $this->sessions->getBySessionId($sessionId);
+        $session = $this->ownedSession($sessionId, $agentProfile);
         if ($session === null) {
             return $this->notFound();
         }
@@ -197,9 +203,9 @@ class CheckoutService
         return new CheckoutResult(200, $resource);
     }
 
-    public function cancel(string $sessionId): CheckoutResult
+    public function cancel(string $sessionId, ?string $agentProfile = null): CheckoutResult
     {
-        $session = $this->sessions->getBySessionId($sessionId);
+        $session = $this->ownedSession($sessionId, $agentProfile);
         if ($session === null) {
             return $this->notFound();
         }
@@ -701,6 +707,26 @@ class CheckoutService
         return new CheckoutResult(400, $this->messages->errorBody(UcpConfig::PROTOCOL_VERSION, [
             $this->messages->error('invalid', $problem[1], Messages::SEVERITY_RECOVERABLE, $problem[0]),
         ]));
+    }
+
+    /**
+     * The session, if it exists and belongs to this platform.
+     *
+     * Ownership is the UCP-Agent profile the checkout was created with
+     * (stored up to 512 characters). A mismatch answers like a missing
+     * checkout, so ids cannot be probed. Before 1.2.0 only the order
+     * endpoint checked this; get, update, complete and cancel did not.
+     */
+    private function ownedSession(string $sessionId, ?string $agentProfile): ?Session
+    {
+        $session = $this->sessions->getBySessionId($sessionId);
+        if ($session === null || $agentProfile === null) {
+            return $session;
+        }
+
+        $caller = mb_substr($agentProfile, 0, 512);
+
+        return $caller !== '' && hash_equals($session->agentProfile, $caller) ? $session : null;
     }
 
     private function notFound(): CheckoutResult

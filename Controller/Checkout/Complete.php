@@ -23,6 +23,6 @@ class Complete extends AbstractAction implements HttpPostActionInterface
 
     protected function process(array $body, string $agentProfile): CheckoutResult
     {
-        return $this->checkout->complete($this->checkoutId());
+        return $this->checkout->complete($this->checkoutId(), $agentProfile);
     }
 }

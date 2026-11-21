@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/angeo-dev/module-ucp-checkout/actions/workflows/ci.yml/badge.svg)](https://github.com/angeo-dev/module-ucp-checkout/actions/workflows/ci.yml)
 [![Packagist Version](https://img.shields.io/packagist/v/angeo/module-ucp-checkout)](https://packagist.org/packages/angeo/module-ucp-checkout)
+[![Downloads](https://img.shields.io/packagist/dt/angeo/module-ucp-checkout)](https://packagist.org/packages/angeo/module-ucp-checkout)
 [![PHP](https://img.shields.io/badge/PHP-8.1%20%E2%80%93%208.5-777bb4)](composer.json)
 [![Magento](https://img.shields.io/badge/Magento-2.4.6%20%E2%80%93%202.4.9-f26322)](composer.json)
 [![UCP](https://img.shields.io/badge/UCP-2026--08--25-4690BF)](https://ucp.dev)
@@ -138,11 +139,35 @@ curl -s -X POST https://your-store/ucp/v1/checkout-sessions \
 
 ## Conformance
 
+[![UCP conformance](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fangeo-dev%2Fmodule-ucp-checkout%2Fbadges%2Fucp-conformance.json)](https://github.com/angeo-dev/module-ucp-checkout/actions/workflows/ucp-live.yml)
+
 The official [UCP conformance suite](https://github.com/Universal-Commerce-Protocol/conformance)
-tests completion with payment too. This
-module does not do those on purpose (see *Not included*), so a full run will
-not be 77/77. Discovery, version negotiation, the create/get/update/cancel
-lifecycle, idempotency and shipping options are the parts it is built to pass.
+runs nightly against a live store with this module
+(`.github/workflows/ucp-live.yml`, once the `UCP_LIVE_URL` repository
+variable is set). The badge is the runner's own count: passed out of
+executed minus skipped. The suite also tests payment through the agent and
+order simulation, which this module does not do on purpose (see *Not
+included*), so it will not be 77/77; every failure is listed in the job
+summary. Discovery, version negotiation, the create/get/update/cancel
+lifecycle, idempotency and shipping options are the parts it is built to
+pass.
+
+## Security (1.2.0)
+
+- A checkout answers only the platform whose `UCP-Agent` profile created it
+  — every operation, not only the order. Other profiles get 404.
+- `UCP-Agent: profile="…"` is required on every request.
+- Order ids are opaque (`ord_…`), not Magento increment ids. An increment
+  id from 1.1 still works on `GET /orders/{id}`, but only with a verified
+  signature.
+- Idempotency keys are per platform; a store failure answers 503.
+- Webhooks: https, port 443, public addresses only, pinned connection;
+  signed over `ucp-agent` and `@query` too. A round-trip test verifies them
+  with `angeo/module-ucp`'s spec verifier.
+- For real authentication, set *Inbound Signature Verification* to
+  `optional`, then `required` (Stores → Configuration → Angeo UCP → Request
+  Security). `bin/magento angeo:ucp:validate` warns while order is on and
+  verification is off.
 
 ## Checkout over MCP
 

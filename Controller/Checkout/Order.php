@@ -12,6 +12,8 @@ use Angeo\UcpCheckout\Controller\Router;
 use Angeo\UcpCheckout\Model\CheckoutResult;
 use Angeo\UcpCheckout\Model\Messages;
 use Angeo\UcpCheckout\Model\OrderMapper;
+use Angeo\UcpCheckout\Model\OrderReference;
+use Angeo\UcpCheckout\Model\Session as CheckoutSession;
 use Angeo\UcpCheckout\Model\SessionRepository;
 use Angeo\Ucp\Api\SignatureVerifierInterface;
 use Angeo\Ucp\Model\Config as UcpConfig;
@@ -84,13 +86,12 @@ class Order extends AbstractAction implements HttpGetActionInterface
             'messages' => [$this->messages->error('not_found', 'Order not found.', Messages::SEVERITY_UNRECOVERABLE)],
         ]);
 
-        $session = $this->sessions->getByOrderIncrementId((string) $this->request->getParam(Router::PARAM_ORDER, ''));
+        $session = $this->findSession((string) $this->request->getParam(Router::PARAM_ORDER, ''));
         if ($session === null || $session->orderId === null
-            || $agentProfile === '' || !hash_equals($session->agentProfile, $agentProfile)
+            || $agentProfile === '' || !hash_equals($session->agentProfile, mb_substr($agentProfile, 0, 512))
         ) {
             return $notFound;
         }
-
         try {
             $order = $this->orders->get($session->orderId);
         } catch (NoSuchEntityException) {
@@ -100,5 +101,24 @@ class Order extends AbstractAction implements HttpGetActionInterface
             return $notFound;
         }
         return new CheckoutResult(200, $this->mapper->toEntity($order, $session));
+    }
+
+    /**
+     * Order ids are opaque since 1.2.0 (OrderReference). An increment id —
+     * what 1.1 handed out — is still looked up, but only for a request whose
+     * signature verified: unsigned, a sequential id would be enumerable.
+     */
+    private function findSession(string $orderId): ?CheckoutSession
+    {
+        $checkoutId = OrderReference::toCheckoutId($orderId);
+        if ($checkoutId !== null) {
+            return $this->sessions->getBySessionId($checkoutId);
+        }
+
+        if ($this->verification?->isVerified()) {
+            return $this->sessions->getByOrderIncrementId($orderId);
+        }
+
+        return null;
     }
 }

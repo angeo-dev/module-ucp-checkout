@@ -45,7 +45,8 @@ class OrderMapper
 
         $entity = [
             'ucp'           => self::envelope(),
-            'id'            => (string) $order->getIncrementId(),
+            // Opaque id (1.2.0): increment ids are sequential.
+            'id'            => OrderReference::fromCheckoutId($session->sessionId),
             'label'         => 'Order #' . $order->getIncrementId(),
             'checkout_id'   => $session->sessionId,
             'permalink_url' => $session->orderUrl !== null && $session->orderUrl !== ''

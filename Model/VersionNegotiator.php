@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Angeo\UcpCheckout\Model;
 
+use Angeo\Ucp\Model\AgentHeader;
 use Angeo\Ucp\Model\Config as UcpConfig;
 
 /**
@@ -32,19 +33,9 @@ class VersionNegotiator
      */
     public function parseAgentHeader(string $header): array
     {
-        $out = ['profile' => '', 'version' => ''];
-        foreach (preg_split('/[;,]/', $header) ?: [] as $member) {
-            if (!str_contains($member, '=')) {
-                continue;
-            }
-            [$key, $value] = array_map('trim', explode('=', $member, 2));
-            $value = trim($value, '"');
-            $key = strtolower($key);
-            if (($key === 'profile' || $key === 'version') && $value !== '') {
-                $out[$key] = $value;
-            }
-        }
-        return $out;
+        // One RFC 8941 parser for the suite (angeo/module-ucp 2.2.2). The
+        // 1.1 split on [;,] broke on a profile URL containing ';' or ','.
+        return AgentHeader::parse($header);
     }
 
     /**

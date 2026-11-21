@@ -10,6 +10,7 @@ namespace Angeo\UcpCheckout\Controller\Checkout;
 
 use Angeo\Ucp\Api\SignatureVerifierInterface;
 use Angeo\Ucp\Model\Config as UcpConfig;
+use Angeo\Ucp\Model\Signature\VerificationResult;
 use Angeo\UcpCheckout\Controller\Router;
 use Angeo\UcpCheckout\Model\CheckoutResult;
 use Angeo\UcpCheckout\Model\CheckoutService;
@@ -30,11 +31,16 @@ use Psr\Log\LoggerInterface;
  *
  *  1. 404 unless Angeo_Ucp is on and checkout is declared in the profile —
  *     serving an undeclared capability contradicts the profile;
- *  2. inbound RFC 9421 signature policy (same rules as Angeo_UcpCatalog);
- *  3. UCP-Agent version negotiation: 422 for a version we do not serve;
+ *  2. inbound RFC 9421 signature policy (same rules as Angeo_UcpCatalog),
+ *     with the spec's error codes (signature_invalid, key_not_found, …);
+ *  3. UCP-Agent: a `profile` is required (400 without one, 1.2.0) and its
+ *     version is negotiated: 422 for a version we do not serve;
  *  4. body: JSON object, at most 256 KB;
- *  5. Idempotency-Key: replay on the same body, 409 on a different body;
- *  6. the operation itself; JSON out with Cache-Control: no-store.
+ *  5. Idempotency-Key, scoped to the calling profile (1.2.0): replay on the
+ *     same body, 409 on a different body, 503 when the store is down
+ *     (the spec's fail-closed rule);
+ *  6. the operation itself, for the calling profile only; JSON out with
+ *     Cache-Control: no-store.
  *
  * Form-key CSRF is bypassed on purpose (CsrfAwareActionInterface): callers
  * are agents authenticated by signature, not browser sessions.
@@ -42,6 +48,9 @@ use Psr\Log\LoggerInterface;
 abstract class AbstractAction implements CsrfAwareActionInterface
 {
     private const MAX_BODY_BYTES = 262144;
+
+    /** Outcome of the signature check for this request; null when disabled. */
+    protected ?VerificationResult $verification = null;
 
     public function __construct(
         protected readonly ResultFactory $resultFactory,
@@ -90,6 +99,16 @@ abstract class AbstractAction implements CsrfAwareActionInterface
             ));
         }
 
+        // The checkout belongs to the platform that created it. A verified
+        // signature names that platform; otherwise the UCP-Agent profile
+        // it sends does. Every request MUST carry one (spec, REST binding).
+        $agentProfile = $this->verification?->isVerified()
+            ? (string) $this->verification->agentProfileUrl
+            : $agent['profile'];
+        if ($agentProfile === '') {
+            return $this->error(400, 'invalid', 'A UCP-Agent header with a profile is required: UCP-Agent: profile="https://…".');
+        }
+
         $raw = (string) $this->request->getContent();
         if (strlen($raw) > self::MAX_BODY_BYTES) {
             return $this->error(413, 'invalid', 'Request body is too large.');
@@ -107,12 +126,20 @@ abstract class AbstractAction implements CsrfAwareActionInterface
         $key = trim((string) $this->request->getHeader('Idempotency-Key'));
         $sessionId = (string) $this->request->getParam(Router::PARAM_ID, '');
         $hash = '';
+        $scopedKey = '';
         if ($operation !== null && $key !== '') {
             if (strlen($key) > IdempotencyStore::MAX_KEY_LENGTH) {
                 return $this->error(400, 'invalid', 'Idempotency-Key is too long.');
             }
             $hash = $this->requestHash->hash($this->request->getMethod(), $sessionId, $raw);
-            $stored = $this->idempotency->find($operation, $key, $sessionId);
+            $scopedKey = IdempotencyStore::scopedKey($agentProfile, $key);
+            try {
+                $stored = $this->idempotency->find($operation, $scopedKey, $sessionId);
+            } catch (\Throwable $e) {
+                // Spec: storage failures fail closed with 503.
+                $this->logger->error('[Angeo_UcpCheckout] Idempotency store unavailable: ' . $e->getMessage());
+                return $this->error(503, 'service_unavailable', 'Idempotency store unavailable. Retry with the same key.');
+            }
             if ($stored !== null) {
                 if (!hash_equals($stored['hash'], $hash)) {
                     return $this->error(409, 'idempotency_key_reused', 'This Idempotency-Key was used with a different request.');
@@ -122,15 +149,21 @@ abstract class AbstractAction implements CsrfAwareActionInterface
         }
 
         try {
-            $result = $this->process($body, $agent['profile']);
+            $result = $this->process($body, $agentProfile);
         } catch (\Throwable $e) {
             $this->logger->error('[Angeo_UcpCheckout] ' . static::class . ' failed: ' . $e->getMessage());
             return $this->error(500, 'internal_error', 'Internal error while processing the request.');
         }
 
         $json = $this->encode($result->body);
-        if ($operation !== null && $key !== '' && $result->status < 500) {
-            $this->idempotency->save($operation, $key, $sessionId, $hash, $result->status, $json);
+        if ($operation !== null && $scopedKey !== '' && $result->status < 500) {
+            try {
+                $this->idempotency->save($operation, $scopedKey, $sessionId, $hash, $result->status, $json);
+            } catch (\Throwable $e) {
+                // The operation already ran; answer it, and log that a
+                // retry with this key will run it again.
+                $this->logger->error('[Angeo_UcpCheckout] Idempotency result not stored: ' . $e->getMessage());
+            }
         }
         return $this->raw($result->status, $json);
     }
@@ -150,11 +183,13 @@ abstract class AbstractAction implements CsrfAwareActionInterface
 
     private function enforceSignaturePolicy(HttpRequest $request): ?ResultInterface
     {
+        $this->verification = null;
         $mode = $this->ucpConfig->getInboundSignatureMode();
         if ($mode === UcpConfig::SIGNATURE_MODE_DISABLED) {
             return null;
         }
         $result = $this->signatureVerifier->verify($request);
+        $this->verification = $result;
         if ($result->isVerified()) {
             return null;
         }
@@ -167,9 +202,12 @@ abstract class AbstractAction implements CsrfAwareActionInterface
             $mode,
             $result->reason !== '' ? $result->reason : 'no signature present'
         ));
+        // Spec error codes and statuses (signatures, "Error Codes"). The
+        // message stays generic: naming the failed component would help a
+        // forger iterate.
         return $this->error(
-            401,
-            'unauthorized',
+            $result->httpStatus(),
+            $result->code !== '' ? $result->code : VerificationResult::CODE_SIGNATURE_INVALID,
             $result->isUnsigned()
                 ? 'This endpoint requires a signed request (RFC 9421).'
                 : 'Request signature could not be verified.'

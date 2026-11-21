@@ -4,6 +4,72 @@ All notable changes to `angeo/module-ucp-checkout` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-21
+
+Security release. Upgrade together with `angeo/module-ucp` 2.2.2 and, if
+installed, `angeo/module-ucp-checkout-mcp` 1.0.1 (enforced through
+`conflict`).
+
+### Security
+
+- **Checkouts answer only the platform that created them.** Get, update,
+  complete and cancel did not compare the caller's `UCP-Agent` profile
+  with the creator's; only the order endpoint did. Now every operation
+  does, and a checkout of another platform answers 404 like a missing one.
+- **Order ids are no longer sequential.** `order.id` (in the checkout and
+  in `GET /orders/{id}` and webhooks) was Magento's increment id. With
+  signature verification off, anyone who knew a platform's public profile
+  URL could walk the numbers and read addresses and tracking. The id is
+  now `ord_` + the random part of the checkout id
+  (`Model\OrderReference`); the label still shows `Order #000000123`.
+  An increment id is still accepted by `GET /orders/{id}`, but only on a
+  request whose signature verified.
+- **Idempotency keys are scoped to the calling profile.** Two platforms
+  sending the same key no longer share a stored result (a create replayed
+  another platform's checkout for an identical body). Stored as a
+  length-prefixed SHA-256 of profile and key.
+- **Webhook delivery uses the shared address guard** from
+  `angeo/module-ucp` 2.2.2 (https, port 443, all addresses global,
+  connection pinned). 1.1 picked the first public A record, ignored AAAA,
+  and missed 100.64.0.0/10.
+
+### Changed
+
+- `UCP-Agent` with a `profile` is required on every checkout request
+  (400 without one). Parsing moved to `Angeo\Ucp\Model\AgentHeader`;
+  `VersionNegotiator::parseAgentHeader()` delegates to it.
+- With a verified signature, the owner is the profile that supplied the
+  verifying key.
+- Signature failures answer with the spec's codes and statuses
+  (`signature_missing`/`signature_invalid`/`key_not_found` 401,
+  `digest_mismatch`/`algorithm_unsupported` 400) instead of
+  `unauthorized`.
+- Idempotency store failures fail closed with 503 (spec), instead of an
+  unhandled exception.
+- Webhook signatures cover `ucp-agent` and, when the webhook URL has a
+  query, `@query` — both required when present, so a strict verifier
+  skipped 1.1 signatures. `WebhookSigner::sign()` takes the `UCP-Agent`
+  value as a new optional last argument.
+- `CheckoutService::get()/update()/complete()/cancel()` take the caller's
+  profile as a new optional last argument; null keeps the 1.1 behaviour
+  for callers built against it.
+
+### Tests
+
+- 32 → 53 unit tests: ownership on every operation, request policy
+  (profile required, conformance header shape, 422 on a future version,
+  503 fail-closed, scoped idempotency, spec error codes, verified owner),
+  order references, and a round trip that signs webhooks with this module
+  and verifies them with `angeo/module-ucp`'s spec verifier (ES256 and
+  Ed25519; a 1.1-style webhook is shown to be skipped).
+
+### Build
+
+- `.github/workflows/ucp-live.yml`: the official conformance suite
+  (`core,shopping`) against a live store, nightly, with a badge on the
+  `badges` branch. Off until the `UCP_LIVE_URL` repository variable is set;
+  store test data in `Test/Conformance/live/`.
+
 ## [1.1.1] - 2026-10-26
 
 ### Security

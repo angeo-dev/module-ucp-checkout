@@ -92,7 +92,8 @@ class CheckoutMapper
         if ($status === Session::STATUS_COMPLETED && $session->orderIncrementId !== null) {
             // order_confirmation.json REQUIRES permalink_url.
             $resource['order'] = [
-                'id'            => $session->orderIncrementId,
+                // Opaque id (1.2.0): increment ids are sequential.
+                'id'            => OrderReference::fromCheckoutId($session->sessionId),
                 'label'         => 'Order #' . $session->orderIncrementId,
                 'permalink_url' => $session->orderUrl !== null && $session->orderUrl !== ''
                     ? $session->orderUrl

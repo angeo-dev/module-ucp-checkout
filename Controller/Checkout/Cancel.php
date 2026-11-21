@@ -23,6 +23,6 @@ class Cancel extends AbstractAction implements HttpPostActionInterface
 
     protected function process(array $body, string $agentProfile): CheckoutResult
     {
-        return $this->checkout->cancel($this->checkoutId());
+        return $this->checkout->cancel($this->checkoutId(), $agentProfile);
     }
 }

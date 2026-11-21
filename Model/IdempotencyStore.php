@@ -21,6 +21,21 @@ class IdempotencyStore
     private const TABLE = 'angeo_ucp_checkout_idempotency';
     public const MAX_KEY_LENGTH = 255;
 
+    /**
+     * The stored key for one platform's Idempotency-Key (1.2.0).
+     *
+     * Keys are scoped to the calling profile: two platforms that happen to
+     * send the same key must not share results. Before 1.2.0 a create with
+     * a known key and body replayed another platform's checkout. Hashed, so
+     * the column length does not depend on the client's key length; the
+     * profile is length-prefixed so no profile/key pair can collide with
+     * another by moving characters across the boundary.
+     */
+    public static function scopedKey(string $agentProfile, string $key): string
+    {
+        return hash('sha256', strlen($agentProfile) . ':' . $agentProfile . "\n" . $key);
+    }
+
     public function __construct(
         private readonly ResourceConnection $resource
     ) {

@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Angeo\UcpCheckout\Model;
 
 use Angeo\Ucp\Model\Config as UcpConfig;
+use Angeo\Ucp\Model\Network\PublicAddressGuard;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
@@ -39,7 +40,8 @@ class WebhookSender
         private readonly WebhookSigner $signer,
         private readonly SigningKey $signingKey,
         private readonly StoreManagerInterface $storeManager,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly PublicAddressGuard $addressGuard
     ) {
     }
 
@@ -92,8 +94,11 @@ class WebhookSender
 
         $body = (string) json_encode($this->orderMapper->toEntity($order, $session), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $profileUrl = rtrim((string) $this->storeManager->getStore((int) $order->getStoreId())->getBaseUrl(), '/') . '/.well-known/ucp';
-        $headers = $this->signer->sign('POST', $url, $body, $key['kid'], $key['pem']) + [
-            'UCP-Agent'         => 'profile="' . $profileUrl . '"; version="' . UcpConfig::PROTOCOL_VERSION . '"',
+        // The UCP-Agent header is signed too (1.2.0): the spec requires a
+        // present ucp-agent to be covered, so a strict verifier skips a
+        // signature that leaves it out.
+        $ucpAgent = 'profile="' . $profileUrl . '"; version="' . UcpConfig::PROTOCOL_VERSION . '"';
+        $headers = $this->signer->sign('POST', $url, $body, $key['kid'], $key['pem'], null, $ucpAgent) + [
             'Webhook-Id'        => (string) $row['event_id'],
             'Webhook-Timestamp' => (string) time(),
         ];
@@ -107,12 +112,11 @@ class WebhookSender
      */
     private function post(string $url, string $body, array $headers): array
     {
-        $parts = parse_url($url);
-        $host = (string) ($parts['host'] ?? '');
-        $port = (int) ($parts['port'] ?? 443);
-        $ip = $this->publicAddress($host);
-        if ($ip === null) {
-            return [0, 'webhook host does not resolve to a public address'];
+        // Same guard as the profile fetcher (angeo/module-ucp 2.2.2): https,
+        // port 443, every resolved address global, connect to the checked one.
+        $target = $this->addressGuard->inspect($url, $reason);
+        if ($target === null) {
+            return [0, 'webhook URL refused: ' . (string) $reason];
         }
 
         $curl = curl_init($url);
@@ -128,26 +132,12 @@ class WebhookSender
             CURLOPT_PROTOCOLS      => CURLPROTO_HTTPS,
             CURLOPT_CONNECTTIMEOUT => 3,
             CURLOPT_TIMEOUT        => self::TIMEOUT,
-            CURLOPT_RESOLVE        => [$host . ':' . $port . ':' . (str_contains($ip, ':') ? '[' . $ip . ']' : $ip)],
+            CURLOPT_RESOLVE        => [PublicAddressGuard::resolveEntry($target)],
             CURLOPT_USERAGENT      => 'Angeo-UCP-Webhooks/' . Config::MODULE_VERSION,
         ]);
         $response = curl_exec($curl);
         $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
         $error = $response === false ? curl_error($curl) : ($status >= 300 ? 'HTTP ' . $status : '');
         return [$status, $error];
-    }
-
-    private function publicAddress(string $host): ?string
-    {
-        if ($host === '') {
-            return null;
-        }
-        $candidates = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : (gethostbynamel($host) ?: []);
-        foreach ($candidates as $ip) {
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
-                return $ip;
-            }
-        }
-        return null;
     }
 }

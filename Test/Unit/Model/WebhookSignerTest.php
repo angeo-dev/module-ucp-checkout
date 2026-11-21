@@ -42,7 +42,8 @@ class WebhookSignerTest extends TestCase
 
         self::assertSame('sha-256=:' . base64_encode(hash('sha256', self::BODY, true)) . ':', $headers['Content-Digest']);
         self::assertSame(
-            'sig1=("@method" "@authority" "@path" "content-digest" "content-type");created=1760000000;keyid="shop-2026"',
+            // 1.2.0: the URL has a query, so @query is covered (spec: required when present).
+            'sig1=("@method" "@authority" "@path" "@query" "content-digest" "content-type");created=1760000000;keyid="shop-2026"',
             $headers['Signature-Input']
         );
         self::assertMatchesRegularExpression('/^sig1=:[A-Za-z0-9+\/=]+:$/', $headers['Signature']);
@@ -51,7 +52,7 @@ class WebhookSignerTest extends TestCase
         self::assertSame(64, strlen($raw), 'ES256 r||s is 64 bytes');
 
         $base = $signer->signatureBase('POST', self::URL, $headers['Content-Digest'], 'application/json', substr($headers['Signature-Input'], 5));
-        self::assertStringContainsString("\"@authority\": platform.example.com\n\"@path\": /webhooks/ucp/orders\n", $base);
+        self::assertStringContainsString("\"@authority\": platform.example.com\n\"@path\": /webhooks/ucp/orders\n\"@query\": ?x=1\n", $base);
         self::assertSame(1, openssl_verify($base, self::rawToDer($raw), $public, OPENSSL_ALGO_SHA256));
     }
 

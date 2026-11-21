@@ -13,7 +13,9 @@ namespace Angeo\UcpCheckout\Model;
  * request signing + RFC 9530 Content-Digest).
  *
  * Signed components: @method @authority @path content-digest content-type,
- * with `created` and `keyid`. Keys: ES256, ES384 (OpenSSL) and Ed25519
+ * plus @query when the webhook URL has one and ucp-agent when the header is
+ * sent (1.2.0 — the spec requires both to be covered when present), with
+ * `created` and `keyid`; no `alg`, which the spec leaves out. Keys: ES256, ES384 (OpenSSL) and Ed25519
  * (libsodium), PKCS#8 PEM — the format `angeo:ucp:keys:generate` prints.
  */
 class WebhookSigner
@@ -23,43 +25,94 @@ class WebhookSigner
     private const ED25519_PKCS8_PREFIX = '302e020100300506032b657004220420';
 
     /**
+     * @param string|null $ucpAgent UCP-Agent header value to send and cover.
      * @return array<string, string> headers to add
      * @throws \RuntimeException when the key cannot sign
      */
-    public function sign(string $method, string $url, string $body, string $kid, string $privatePem, ?int $created = null): array
-    {
+    public function sign(
+        string $method,
+        string $url,
+        string $body,
+        string $kid,
+        string $privatePem,
+        ?int $created = null,
+        ?string $ucpAgent = null
+    ): array {
         $digest = 'sha-256=:' . base64_encode(hash('sha256', $body, true)) . ':';
-        $params = '(' . implode(' ', array_map(static fn (string $c): string => '"' . $c . '"', self::COMPONENTS)) . ')'
+        $params = '(' . implode(' ', array_map(
+            static fn (string $c): string => '"' . $c . '"',
+            self::components($url, $ucpAgent)
+        )) . ')'
             . ';created=' . ($created ?? time())
             . ';keyid="' . str_replace('"', '', $kid) . '"';
 
-        $base = $this->signatureBase($method, $url, $digest, 'application/json', $params);
+        $base = $this->signatureBase($method, $url, $digest, 'application/json', $params, $ucpAgent);
         $signature = $this->rawSignature($base, $privatePem);
 
-        return [
+        $headers = [
             'Content-Type'    => 'application/json',
             'Content-Digest'  => $digest,
             'Signature-Input' => 'sig1=' . $params,
             'Signature'       => 'sig1=:' . base64_encode($signature) . ':',
         ];
+        if ($ucpAgent !== null && $ucpAgent !== '') {
+            $headers['UCP-Agent'] = $ucpAgent;
+        }
+
+        return $headers;
     }
 
-    public function signatureBase(string $method, string $url, string $digest, string $contentType, string $params): string
+    /**
+     * Covered components for a webhook to this URL.
+     *
+     * @return array<int, string>
+     */
+    public static function components(string $url, ?string $ucpAgent = null): array
     {
+        $components = ['@method', '@authority', '@path'];
+        if ((string) parse_url($url, PHP_URL_QUERY) !== '') {
+            $components[] = '@query';
+        }
+        if ($ucpAgent !== null && $ucpAgent !== '') {
+            $components[] = 'ucp-agent';
+        }
+        $components[] = 'content-digest';
+        $components[] = 'content-type';
+
+        return $components;
+    }
+
+    public function signatureBase(
+        string $method,
+        string $url,
+        string $digest,
+        string $contentType,
+        string $params,
+        ?string $ucpAgent = null
+    ): string {
         $parts = parse_url($url);
         $host = strtolower((string) ($parts['host'] ?? ''));
         $port = isset($parts['port']) ? (int) $parts['port'] : null;
         $authority = $host . ($port !== null && $port !== 443 ? ':' . $port : '');
         $path = (string) ($parts['path'] ?? '/');
 
-        return implode("\n", [
-            '"@method": ' . strtoupper($method),
-            '"@authority": ' . $authority,
-            '"@path": ' . ($path === '' ? '/' : $path),
-            '"content-digest": ' . $digest,
-            '"content-type": ' . $contentType,
-            '"@signature-params": ' . $params,
-        ]);
+        $values = [
+            '@method'        => strtoupper($method),
+            '@authority'     => $authority,
+            '@path'          => $path === '' ? '/' : $path,
+            '@query'         => '?' . (string) ($parts['query'] ?? ''),
+            'ucp-agent'      => (string) $ucpAgent,
+            'content-digest' => $digest,
+            'content-type'   => $contentType,
+        ];
+
+        $lines = [];
+        foreach (self::components($url, $ucpAgent) as $component) {
+            $lines[] = '"' . $component . '": ' . $values[$component];
+        }
+        $lines[] = '"@signature-params": ' . $params;
+
+        return implode("\n", $lines);
     }
 
     private function rawSignature(string $base, string $pem): string

@@ -1,0 +1,95 @@
+name: UCP conformance (live store)
+
+# Runs the official UCP conformance suite against a real Magento store with
+# this module installed, and publishes the result as a badge.
+#
+# Off until you set the repository variable UCP_LIVE_URL (Settings → Secrets
+# and variables → Actions → Variables), for example https://demo.angeo.dev.
+# Fill Test/Conformance/live/*.json with that store's test data first.
+#
+# The badge counts what the runner reports: passed / (executed − skipped).
+# Tests for capabilities the module leaves out on purpose — payment through
+# the agent, order simulation — fail or skip; the full list is in the job
+# summary and the artifact. Nothing is filtered out to make the badge green.
+
+on:
+  schedule:
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  UCP_CONFORMANCE_REF: main
+
+jobs:
+  live:
+    if: vars.UCP_LIVE_URL != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Get the conformance suite
+        run: |
+          git clone --quiet https://github.com/Universal-Commerce-Protocol/conformance.git build/conformance
+          git -C build/conformance checkout --quiet "$UCP_CONFORMANCE_REF"
+          uv sync --no-sources --directory build/conformance
+
+      - name: Run core + shopping against ${{ vars.UCP_LIVE_URL }}
+        run: |
+          set +e
+          uv run --no-sources --directory build/conformance ucp-conformance \
+            --server_url="${{ vars.UCP_LIVE_URL }}" \
+            --conformance_input="$GITHUB_WORKSPACE/Test/Conformance/live/conformance_input.json" \
+            --fixture_config="$GITHUB_WORKSPACE/Test/Conformance/live/test_fixtures.json" \
+            --suite=core,shopping --verbose > build/live.txt 2>&1
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          tail -n 20 build/live.txt
+
+      - name: Badge JSON
+        run: |
+          total=$(sed -n 's/^Total Executed: //p' build/live.txt | tail -1)
+          passed=$(sed -n 's/^Passed: //p' build/live.txt | tail -1)
+          skipped=$(sed -n 's/^Skipped: //p' build/live.txt | tail -1)
+          total=${total:-0}; passed=${passed:-0}; skipped=${skipped:-0}
+          ran=$(( total - skipped ))
+          if [ "$ran" -le 0 ]; then color=lightgrey; message="no run"
+          elif [ "$passed" -eq "$ran" ]; then color=brightgreen; message="$passed/$ran passed"
+          elif [ $(( passed * 100 / ran )) -ge 75 ]; then color=yellow; message="$passed/$ran passed"
+          else color=orange; message="$passed/$ran passed"; fi
+          mkdir -p build/badge
+          printf '{"schemaVersion":1,"label":"UCP conformance","message":"%s","color":"%s"}\n' "$message" "$color" > build/badge/ucp-conformance.json
+          cat build/badge/ucp-conformance.json
+          {
+            echo "### UCP conformance — ${{ vars.UCP_LIVE_URL }}"
+            echo "Suite \`$(git -C build/conformance rev-parse --short HEAD)\`: $passed passed, $skipped skipped, $total executed."
+            echo '```'
+            grep -E '^(FAIL|ERROR):' build/live.txt || echo "no failures"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ucp-live-report
+          path: build/live.txt
+
+      - name: Publish the badge on the badges branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin badges > /dev/null; then
+            git fetch --quiet origin badges
+            git worktree add --quiet build/badges-branch origin/badges
+            cd build/badges-branch && git switch --quiet -C badges
+          else
+            git worktree add --quiet --detach build/badges-branch
+            cd build/badges-branch && git switch --quiet --orphan badges && git rm -rq --ignore-unmatch .
+          fi
+          cp "$GITHUB_WORKSPACE/build/badge/ucp-conformance.json" .
+          git add ucp-conformance.json
+          git diff --cached --quiet || git commit --quiet -m "Update UCP conformance badge"
+          git push --quiet origin badges

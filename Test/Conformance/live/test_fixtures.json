@@ -1,0 +1,16 @@
+{
+  "test_fixtures": {
+    "valid_item": { "sku": "24-MB02", "expected_price": 59.0, "quantity": 1 },
+    "valid_discount_code": "UCPTEST10",
+    "expected_discount_percentage": 10.0
+  },
+  "shipping_locations": {
+    "domestic_destination": {
+      "street": "123 Main St",
+      "city": "Springfield",
+      "state": "IL",
+      "postal_code": "62704",
+      "country": "US"
+    }
+  }
+}
